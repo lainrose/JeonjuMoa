@@ -1,0 +1,152 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+import urllib
+from bs4 import BeautifulSoup
+from manager import Manager
+from words import *
+
+class Weather:
+
+    __match_area = '전주시'
+    __match_day = '오늘'
+    manager = Manager()
+  
+    def __init__(self, words):
+        self.words = words
+	self.times = []
+	self.scripts = []
+	self.temps = []
+	self.precips = []
+        self.today_script = ''
+        self.today_temp = ''
+        self.today_temp1 = ''
+	self.script_keys = {'화창' : '(해)',
+                        '맑음' : '(해)',
+                        '구름' : '(구름)',
+                        '흐림' : '(구름)(구름)',
+                        '비' : '(비)',
+                        '소나기' : '(비)',
+                        '눈' : '(눈)',
+                        '밤' : '(잘자)',
+                        }   
+        self.except_keys = ['비', '소나기', '흐림']
+	self.convo()
+
+    def convo(self):
+        self.res_message = ''
+        self.istoday = True
+        
+        for word in self.words:
+            pos = str(word[1])
+            word = str(word[0])
+            
+            if word in get_area():
+                self.__match_area = get_area()[word]
+
+            if word in get_day():
+                if word in get_week():
+                    self.res_message += '요일 날씨 구현중\n\n'
+                    self.istoday = False
+                if word in ['주말']:
+                    self.res_message += '주말 날씨 구현중\n\n'
+                    self.istoday = False
+                if word in ['오늘']:
+                    self.res_message += self.parse()
+                    self.istoday = False
+                self.__match_day = get_day()[word]
+
+        if self.istoday:    
+            self.res_message += self.parse()
+        self.manager.set_message(self.res_message)
+
+    def parse(self):
+	self.html = urllib.urlopen(
+    		'http://weather.com/ko-KR/weather/hourbyhour/l/KSXX0205:1:KS')
+        self.soup = BeautifulSoup(self.html, 'lxml')
+        
+	self.parse_times = self.soup.find_all(class_ = 'dsx-date')
+	self.parse_scripts = self.soup.find_all(
+    				class_ = 'hidden-cell-sm description')
+	self.parse_temps = self.soup.find_all('td', {'class' : 'temp'})
+	self.parse_precips = self.soup.find_all('td', {'class' : 'precip'})
+
+        self.html = urllib.urlopen(
+                    'http://weather.com/ko-KR/weather/today/l/KSXX0205:1:KS')
+        self.soup = BeautifulSoup(self.html, 'lxml')
+
+        self.today_script = self.soup.find('span', 
+                                class_ = 'today-wx-descrip').string
+        self.today_script = self.today_script.split('. ')
+        self.today_temp = self.today_script[1].split(' ')[0].encode('utf-8')
+        self.today_temp1 = self.today_script[1].split(' ')[1].encode('utf-8')
+        self.today_script = self.today_script[0]
+        
+	for time, script, temp, precip in zip(
+		                    self.parse_times, self.parse_scripts,
+				    self.parse_temps, self.parse_precips):
+
+	    time = time.string.split(':')[0].encode('utf-8')
+	    script = script.span.string.encode('utf-8')
+	    temp = str(temp.span).split(
+                            '<sup>')[0].split(
+                            '<span class="">')[1].encode('utf-8')
+	    precip = str(precip.div.span.next.span).split(
+                            '<span class="percent-symbol">')[0].split(
+                            '<span>')[1].encode('utf-8')
+
+	    self.times.append(int(time))
+	    self.scripts.append(script)
+	    self.temps.append(temp)
+	    self.precips.append(precip)
+
+        return self.process()
+
+    def process(self):
+	self.message = self.__match_day + ' ' + self.__match_area + ' ' +\
+                        '날씨는 ' + self.today_script + '이며,\n예상 ' +\
+                        self.today_temp + ' 기온은 ' + self.today_temp1 +\
+                        ' 입니다.\n\n'
+	for idx, (time, script, temp, precip) in enumerate(zip(
+				    self.times, self.scripts,
+				    self.temps, self.precips)):
+            if idx == 0:
+                pass
+            elif idx % 2 == 0:
+                continue
+
+	    night_times = range(20,24) + range(0,6)
+            for key in self.script_keys:
+                if key in script:
+                    if time in night_times:
+                        if key not in self.except_keys:
+                            script = self.script_keys['밤']
+                    else:
+                        script = self.script_keys[key]
+            if not idx:
+                time = '지금: '
+	    elif time in range(0, 12):
+		time = '오전 ' + str(time) + '시: '
+	    else:
+                if time == 12:
+                    pass
+                else:
+                    time = time - 12
+		time = '오후 ' + str(time) + '시: '
+
+            temp = temp + '℃ '
+
+	    if int(precip) in range(0,10):
+		precip = ''
+	    else:
+		precip = ' (땀) ' + precip + '%'
+            
+            self.blank = '\n'
+            if (idx+1) % 4 == 0 or idx == 0:
+                self.blank = '\n\n'
+                
+	    self.message += time + script + ' ' + temp + precip + self.blank
+
+	return self.message
+
+if __name__ == "__main__":
+    w = Weather([('날씨','Noun')])

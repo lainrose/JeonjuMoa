@@ -52,7 +52,6 @@ def pos_tagger(parm):
 
     jpype.attachThreadToJVM()
     pos = twitter.pos(parm, norm=True, stem=True)
-    jpype.detachThreadFromJVM()
 
     end = time.time() - start
     print("======pos_tagger_time : " + str(round(end, 2)))
@@ -60,5 +59,6 @@ def pos_tagger(parm):
     return pos
 
 if __name__ == "__main__":
-    i = raw_input("키워드 입력하세용 : ")
-    pprint(pos_tagger(i))
+    while(True):
+        i = raw_input("키워드 입력하세용 : ")
+        pprint(pos_tagger(i))

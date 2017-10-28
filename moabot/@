@@ -14,7 +14,6 @@ from morpheme import pos_tagger
 from spellcheck import spellchecker
 from manager import Manager
 from weather import Weather
-from words import *
 
 manager = Manager()
 que = Queue()
@@ -57,9 +56,9 @@ def message(request):
 
     manager.set_message('현재 날씨 서비스 진행중입니다.')
     for word in words:
-        if word in [('날씨', 'Noun'), ('덥다','Adjective'), ('춥다','Adjective')]:
+        if word in [('날씨', 'Noun')]:
             weather = Weather(words)
         else:
-            pass
+           pass
 
     return JsonResponse(manager.get_message())

@@ -1,162 +1,201 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 import urllib
-from bs4 import BeautifulSoup
 from manager import Manager
+from words import *
+from weather_data import *
+from weather_say import *
 
 class Weather:
 
-    __day = [
-        ('오늘', 'Noun'), ('내일','Noun'), ('모레', 'Noun'),
-        ('글피', 'Noun'), ('월요일', 'Noun'), ('화요일', 'Noun'),
-        ('수요일', 'Noun'), ('목요일', 'Noun'), ('금요일', 'Noun'),
-        ('토요일', 'Noun'), ('일요일', 'Noun')
-    ]
-    __area = [
-        ('진북동', 'Noun'), ('인후동', 'Noun'), ('덕진동', 'Noun'),
-        ('금암동', 'Noun'),('팔복동', 'Noun'), ('산정동', 'Noun'),
-        ('금', 'Noun'), ('상동', 'Noun'),('우아동', 'Noun'), 
-        ('호성동', 'Noun'), ('전', 'Noun'), ('미동', 'Noun'),
-        ('송천동', 'Noun'), ('반월동', 'Noun'), ('화전동', 'Noun'),
-        ('용', 'Noun'), ('정동', 'Noun'), ('성덕동', 'Noun'),
-        ('원동', 'Noun'), ('동산동', 'Noun'),('고랑', 'Noun'),
-        ('동', 'Noun'), ('여의동', 'Noun'), ('만', 'Noun'), 
-        ('성동', 'Noun'), ('장동', 'Noun'), ('도도', 'Noun'),
-        ('동', 'Noun'), ('강', 'Noun'), ('흥동', 'Noun'),
-        ('도덕', 'Noun'), ('동', 'Noun'),('남', 'Noun'),
-        ('정동', 'Noun'), ('인후', 'Noun'), ('조촌동', 'Noun')
-    ]
-
     __match_area = '전주시'
     __match_day = '오늘'
+    f_next = False
+    f_prev = False
     manager = Manager()
+    hdays = get_hourly10day()
+    fdays = get_forecast10day()
   
     def __init__(self, words):
         self.words = words
-	self.times = []
-	self.scripts = []
-	self.temps = []
-	self.precips = []
-        self.today_script = ''
-        self.today_temp = ''
-        self.today_temp1 = ''
-	self.script_keys = {'화창' : '(해)',
-                        '맑음' : '(해)',
-                        '구름' : '(구름)',
-                        '흐림' : '(구름)(구름)',
-                        '비' : '(비)',
-                        '소나기' : '(비)',
-                        '눈' : '(눈)',
-                        '밤' : '(잘자)',
-                        }   
-        self.except_keys = ['비', '소나기']
+        self.day_keys = {'월요일' : '월', '화요일' : '화',
+                            '수요일' : '수', '목요일' : '목',
+                            '금요일' : '금', '토요일' : '토',
+                            '일요일' : '일'}
+        self.except_keys = ['(비)', '(구름)', '(비)뇌우']
+        self.next_keys = ['다음', '돌아오다']
+        self.prev_keys = ['어제', '저번']
+        self.res_message = ''
 	self.convo()
 
     def convo(self):
+        self.istoday = True
+        
         for word in self.words:
-            key = word[0]
-            pos = word[1]
+            pos = str(word[1])
+            word = str(word[0])
+            if word in self.next_keys:
+                self.f_next = True
+            if word in self.prev_keys:
+                self.f_prev = True
             
-            if word in self.get_area():
-                self.__match_area = key
+            if word in get_area():
+                self.__match_area = get_area()[word]
 
-            elif word in self.get_day():
-                self.__match_day = key
+            if word in get_day():
+                self.__match_day = get_day()[word]
+                self.res_message += self.fday()
+                print self.res_message
 
-        self.manager.set_message(
-            self.parse()
-        )
+                if word in ['오늘']:
+                    self.res_message += self.hday()
+                if not self.res_message == '':
+                    self.istoday = False
 
-    def get_area(self):
-        return self.__area
+            if word in self.prev_keys:
+                self.res_message = "이전 날씨는 중요하지 않아요.."
+                self.istoday = False
+                break
+            if word in ['덥다']:
+                self.res_message = "더울까요? 날씨를 물어보세요~"
+            if word in ['춥다']:
+                self.res_message = "추울까요? 날씨를 물어보세요~"
 
-    def get_day(self):
-        return self.__day
+        if self.istoday:    
+            self.res_message += self.hday()
+        self.manager.set_message(self.res_message)
 
-    def parse(self):
-	self.html = urllib.urlopen(
-    		'http://weather.com/ko-KR/weather/hourbyhour/l/KSXX0205:1:KS')
-        self.soup = BeautifulSoup(self.html, 'lxml')
-        
-	self.parse_times = self.soup.find_all(class_ = 'dsx-date')
-	self.parse_scripts = self.soup.find_all(
-    				class_ = 'hidden-cell-sm description')
-	self.parse_temps = self.soup.find_all('td', {'class' : 'temp'})
-	self.parse_precips = self.soup.find_all('td', {'class' : 'precip'})
+    def fday(self):
+        self.origin_mssg = self.__match_day + ' ' + self.__match_area + ' ' +\
+                        weather_say(0) + '\n\n'
+        self.copy_mssg = self.origin_mssg
+        mday = self.__match_day.split('요일')[0]
+        print(mday)
+        f_next_week = False
 
-        self.html = urllib.urlopen(
-                    'http://weather.com/ko-KR/weather/today/l/KSXX0205:1:KS')
-        self.soup = BeautifulSoup(self.html, 'lxml')
+        for idx, f in enumerate(self.fdays):
+            date = f['date']
+            day = f['day']
+            cond = f['cond']
+            high = f['high']
+            low = f['low']
+            precip = f['precip']
+            blank = '\n'
 
-        self.today_script = self.soup.find('span', class_ = 'today-wx-descrip').string
-        self.today_script = self.today_script.split('. ')
-        self.today_temp = self.today_script[1].split(' ')[0].encode('utf-8')
-        self.today_temp1 = self.today_script[1].split(' ')[1].encode('utf-8')
-        self.today_script = self.today_script[0]
-        
-	for time, script, temp, precip in zip(
-		                    self.parse_times, self.parse_scripts,
-				    self.parse_temps, self.parse_precips):
+            if int(precip) in range(0,11):
+                precip = ''
+            else:
+                precip = '(땀)' + precip + '%'
 
-	    time = time.string.split(':')[0].encode('utf-8')
-	    script = script.span.string.encode('utf-8')
-	    temp = str(temp.span).split(
-                            '<sup>')[0].split(
-                            '<span class="">')[1].encode('utf-8')
-	    precip = str(precip.div.span.next.span).split(
-                            '<span class="percent-symbol">')[0].split(
-                            '<span>')[1].encode('utf-8')
+            if ((mday in ['내일'] and idx == 1) or
+                (mday in ['모레'] and idx == 2) or
+                (mday in ['글피'] and idx == 3) or
+                (mday in ['주말'] and day in ['토', '일'])):
+                self.copy_mssg += day + '(' + date + ') ' + cond + ' ' +\
+                                high + '°/' + low + '℃  ' + precip + blank
 
-	    self.times.append(int(time))
-	    self.scripts.append(script)
-	    self.temps.append(temp)
-	    self.precips.append(precip)
+            if mday in day:
+                if self.f_next:
+                    pass
 
-        return self.process()
+                self.res_message = ''
+                self.copy_mssg = self.origin_mssg
+                self.copy_mssg += day + '(' + date + ') ' + cond + ' ' +\
+                                high + '°/' + low + '℃  ' + precip + blank
 
-    def process(self):
+            elif mday in ['주']:
+
+                if idx % 2 == 0:
+                    blank = '\n\n'
+
+                #다음 주
+                if self.f_next:
+                    if not idx:
+                        self.copy_mssg = '다음 ' + self.copy_mssg +\
+                                                    weather_say(3) + '\n\n'
+                        continue
+                    if day in ['월']:
+                        f_next_week = True
+                    if f_next_week:
+                        self.copy_mssg += day + '(' + date + ') ' + cond + ' ' +\
+                                        high + '°/' + low + '℃  ' + precip + blank
+                        if day in ['일']:
+                            break
+                #이번 주
+                else:
+                    if not idx:
+                        self.copy_mssg = '이번 ' + self.copy_mssg
+
+                    if day in ['월']:
+                        break
+                    self.copy_mssg += day + '(' + date + ') ' + cond + ' ' +\
+                                    high + '°/' + low + '℃  ' + precip + blank
+
+            elif mday in ['달']:
+                if self.f_next:
+                    self.copy_mssg = "다음 달은 무리랍니다."
+
+                else:
+                    if idx == 0:
+                        self.copy_mssg = "이번 " + self.copy_mssg +\
+                                            weather_say(2) + '\n\n'
+                    if idx % 2 == 0 :
+                        blank = ' | '
+                    if day == '일':
+                        blank = '\n\n'
+                    self.copy_mssg += day + '(' + date + ') ' + cond + ' ' +\
+                                    high + '℃ ' + blank
+        self.copy_mssg += '\n'
+        print self.res_message
+        return self.copy_mssg
+
+
+    def hday(self):
         self.message = self.__match_day + ' ' + self.__match_area + ' ' +\
-                        '날씨는 ' + self.today_script + '이며,\n예상 ' +\
-                        self.today_temp + ' 기온은 ' + self.today_temp1 +\
-                        ' 입니다.\n'
+                        weather_say(1) + '\n\n'
 
-	for idx, (time, script, temp, precip) in enumerate(zip(
-				    self.times, self.scripts,
-				    self.temps, self.precips)):
-            if idx == 0:
-                pass
-            elif idx % 2 == 0:
-                continue
+        for idx, h in enumerate(self.hdays):
+            hour = h['hour']
+            temp = h['temp']
+            ampm = h['ampm']
+            precip = h['precip']
+            cond = h['cond']
+            blank = '\n'
             
 	    night_times = range(20,24) + range(0,6)
-            for key in self.script_keys:
-                if key in script:
-                    if time in night_times:
-                        if key not in self.except_keys:
-                            script = self.script_keys['밤']
-                    else:
-                        script = self.script_keys[key]
+            if int(hour) in night_times:
+                if cond not in self.except_keys:
+                    cond = '(잘자)'
             
-            if not idx:
-                time = '지금: '
-	    elif time in range(0, 12):
-		time = '오전 ' + str(time) + '시: '
-	    else:
-                if time == 12:
+            if h['ampm'] == '오후':
+                hour_int = int(hour)
+                if hour_int == 12:
                     pass
                 else:
-                    time = time - 12
-		time = '오후 ' + str(time) + '시: '
+                    hour = str(hour_int - 12)
 
-            temp = temp + '℃ '
-
-	    if int(precip) in range(0,10):
+	    if int(precip) in range(0,11):
 		precip = ''
-	    else:
-		precip = ' (땀) ' + precip + '%'
+            else:
+                precip = '(땀)' + precip + '%'
+            
+            if (idx+1) % 4 in [0, 1] :
+                blank = '\n\n'
 
-	    self.message += time + script + ' ' + temp + precip + '\n\n'
-			
+            if ampm == '오전' and (hour in ['1']) and idx != 0:
+                break
+            elif idx % 2 == 0:
+                if idx == 0:
+                    self.message += '지금' + ' ' + ' : ' + ' ' + cond +\
+                                    ' ' + temp + '℃  ' + precip + blank
+                    continue
+                elif hour in ['0']:
+                    pass
+                else:
+                    continue
+	    self.message += ampm + ' ' + hour + '시 : ' + ' ' + cond + ' ' +\
+                            temp + '℃  ' + precip + blank
+
 	return self.message
 
 if __name__ == "__main__":

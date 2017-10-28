@@ -1,15 +1,24 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
+class Singleton(type):
+    
+    def __call__(cls, *args, **kwargs):
+        try:
+            return cls.__instance
+            
+        except AttributeError: 
+            cls.__instance = super(Singleton, cls).__call__(*args, **kwargs)
+            return cls.__instance
 
-class Manager:
+class Manager(object):
 	
+        __metaclass__ = Singleton
+
 	def __init__(self):
 		self.__message = {'message': {'text' : ''}}
 
 	def set_message(self, text):
-                print(text)
 		self.__message['message']['text'] = text
-                print(self.__message)
 
 	def get_message(self):
 		return self.__message
