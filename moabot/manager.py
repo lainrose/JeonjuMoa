@@ -20,6 +20,8 @@ class Manager(object):
 	def set_message(self, text):
 		self.__message['message']['text'] = text
 
-	def get_message(self):
-		return self.__message
-
+	def get_message(self, text = ''):
+                if text == 'json':
+		    return self.__message
+                else:
+                    return self.__message['message']['text']

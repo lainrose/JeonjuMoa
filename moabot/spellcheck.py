@@ -8,8 +8,6 @@ import time
 
 def spellchecker(text):
     
-    start = time.time()
-
     url = "https://m.search.naver.com/p/csearch/dcontent/spellchecker.nhn"
     params = { 
         '_callback': 'window.mycallback',
@@ -25,8 +23,6 @@ def spellchecker(text):
     js = json.loads(response)
     result = js['message']['result']['html']
     result = re.sub(r'<\/?.*?>', '', result)
-
-    end = time.time()- start
 
     return result
 

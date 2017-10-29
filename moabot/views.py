@@ -54,12 +54,17 @@ def message(request):
     print(sentence)
     sentence = spellchecker(sentence)
     words = pos_tagger(sentence)
+    text = '현재 날씨 서비스 진행중입니다.\n\n'
 
-    manager.set_message('현재 날씨 서비스 진행중입니다.')
+    manager.set_message(text)
     for word in words:
         if word in [('날씨', 'Noun'), ('덥다','Adjective'), ('춥다','Adjective')]:
             weather = Weather(words)
         else:
             pass
 
-    return JsonResponse(manager.get_message())
+    if manager.get_message() == text:
+        for word in words:
+            manager.set_message(manager.get_message() + word[0] + ' ')
+    
+    return JsonResponse(manager.get_message('json'))
